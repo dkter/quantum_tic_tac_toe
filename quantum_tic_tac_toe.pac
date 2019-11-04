@@ -95,6 +95,59 @@ at: pos
 atX: x y: y
 	^(board at: y) at: x!
 
+cyclicEntanglementStartingAtX: x y: y
+	| initialCell initialTile initialPos currentTile currentPos done entangledCells otherTries |
+	initialPos := Array with: x with: y.
+	initialCell := self atX: x y: y.
+	(QuantumTTTGame isCellSuperposition: initialCell) ifFalse: [^nil].
+	initialTile := initialCell at: 1.
+	entangledCells := OrderedCollection new.
+	otherTries := OrderedCollection new.
+
+	currentTile := initialTile.
+	currentPos := initialPos.
+	done := false.
+	[done] whileFalse: [
+		| cell tiles |
+		currentPos := self getSuperpositionPartnerOf: currentTile atX: (currentPos at: 1) y: (currentPos at: 2).
+		cell := self at: currentPos.
+		(QuantumTTTGame isCellSuperposition: cell) ifFalse: [
+			(otherTries isEmpty) ifTrue: [
+				done := true.
+				^nil
+			]
+			ifFalse: [
+				"The search hit a dead end, time to backtrack"
+				| state |
+				state := otherTries removeFirst.
+				cell := state at: 1.
+				entangledCells := state at: 2
+			]
+		].
+		"If the cell has more than 2 states, pick one and add the rest to a queue, saving the state of entangledCells"
+		tiles := (cell reject: [:tile | tile = currentTile]).
+		currentTile := tiles removeFirst.
+		(tiles isEmpty) ifFalse: [
+			otherTries add: (Array with: tiles with: (entangledCells copy)).
+		].
+
+		entangledCells add: currentPos.
+		(currentTile = initialTile) ifTrue: [
+			done := true.
+			^entangledCells
+		]
+	]!
+
+findCyclicEntanglements
+	1 to: (board size) do: [:y | 
+		1 to: ((board at: 1) size) do: [:x |
+			| entanglement |
+			entanglement := self cyclicEntanglementStartingAtX: x y: y.
+			(entanglement = nil) ifFalse: [^entanglement]
+		]
+	].
+	^nil!
+
 getSuperpositionPartnerOf: tile atX: x y: y
 	board doWithIndex: [ :row :iy |
 		row doWithIndex: [ :cell :ix |
@@ -150,6 +203,8 @@ placeSuperposition: tile x1: x1 y1: y1 x2: x2 y2: y2
 	! !
 !QuantumTTTGame categoriesFor: #at:!public! !
 !QuantumTTTGame categoriesFor: #atX:y:!public! !
+!QuantumTTTGame categoriesFor: #cyclicEntanglementStartingAtX:y:!public! !
+!QuantumTTTGame categoriesFor: #findCyclicEntanglements!public! !
 !QuantumTTTGame categoriesFor: #getSuperpositionPartnerOf:atX:y:!public! !
 !QuantumTTTGame categoriesFor: #initialize!public! !
 !QuantumTTTGame categoriesFor: #isCyclicEntanglementStartingAtX:y:!public! !
@@ -159,7 +214,7 @@ placeSuperposition: tile x1: x1 y1: y1 x2: x2 y2: y2
 !QuantumTTTGame class methodsFor!
 
 isCellSuperposition: aCell
-	^(aCell isMemberOf: OrderedCollection)!
+	^(aCell isMemberOf: OrderedCollection) and: [aCell size >= 2]!
 
 isCellSuperpositionOf2Tiles: aCell
 	^(aCell isMemberOf: OrderedCollection) and: [
