@@ -50,6 +50,16 @@ QuantumTTTTile comment: ''!
 !QuantumTTTTile categoriesForClass!Kernel-Objects! !
 !QuantumTTTTile methodsFor!
 
+printOn: aStream
+	aStream nextPutAll: 'a QuantumTTTTile('.
+	symbol printOn: aStream.
+	aStream  nextPutAll: ', turn '.
+	turn printOn: aStream.
+	aStream nextPutAll: ')'!
+
+printString
+	^'QuantumTTTTile(' , (symbol printString) , ', turn ' , (turn printString) , ')'!
+
 symbol
 	^symbol!
 
@@ -61,6 +71,8 @@ turn
 
 turn: anInteger
 	turn := anInteger! !
+!QuantumTTTTile categoriesFor: #printOn:!public! !
+!QuantumTTTTile categoriesFor: #printString!public! !
 !QuantumTTTTile categoriesFor: #symbol!public! !
 !QuantumTTTTile categoriesFor: #symbol:!private! !
 !QuantumTTTTile categoriesFor: #turn!public! !
