@@ -95,6 +95,9 @@ at: pos
 atX: x y: y
 	^(board at: y) at: x!
 
+board
+	^board!
+
 cyclicEntanglementStartingAtX: x y: y
 	| initialCell initialTile initialPos currentTile currentPos done entangledCells otherTries |
 	initialPos := Array with: x with: y.
@@ -164,30 +167,8 @@ initialize
 		       with: (Array ofSize: 3)
 		       with: (Array ofSize: 3).!
 
-isCyclicEntanglementStartingAtX: x y: y
-	| initialCell initialTile initialPos currentTile currentPos done |
-	initialPos := Array with: x with: y.
-	initialCell := self atX: x y: y.
-	(QuantumTTTGame isCellSuperposition: initialCell) ifFalse: [^false].
-	initialTile := initialCell at: 1.
-
-	currentTile := initialTile.
-	currentPos := initialPos.
-	done := false.
-	[done] whileFalse: [
-		| cell |
-		currentPos := self getSuperpositionPartnerOf: currentTile atX: (currentPos at: 1) y: (currentPos at: 2).
-		cell := self at: currentPos.
-		(QuantumTTTGame isCellSuperpositionOf2Tiles: cell) ifFalse: [
-			done := true.
-			^false.
-		].
-		currentTile := (cell reject: [:tile | tile = currentTile]) at: 1.
-		(currentTile = initialTile) ifTrue: [
-			done := true.
-			^true.
-		]
-	].!
+place: tile at: pos
+	^self place: tile x: (pos at: 1) y: (pos at: 2)!
 
 place: tile x: x y: y
 	((self atX: x y: y) isMemberOf: OrderedCollection) ifTrue: [
@@ -200,16 +181,76 @@ place: tile x: x y: y
 placeSuperposition: tile x1: x1 y1: y1 x2: x2 y2: y2
 	self place: tile x: x1 y: y1.
 	self place: tile x: x2 y: y2.
-	! !
+	!
+
+put: tile at: pos
+	^self put: tile x: (pos at: 1) y: (pos at: 2)!
+
+put: tile x: x y: y
+	(board at: y) at: x put: tile!
+
+resolveCycle: aCyclicEntanglement atX: x y: y tile: aTile
+	"Given a cyclic entanglement as a list of positions,
+	resolve it so that aTile is a classical tile at (x, y)."
+	| initialCell currentCell currentTile cells |
+	initialCell := self atX: x y: y.
+	currentCell := initialCell.
+	currentTile := aTile.
+	self place: aTile x: x y: y.
+	cells := aCyclicEntanglement.
+
+	[
+		cells := cells reject: [:cell | cell = currentCell].
+		cells isEmpty
+	] whileFalse: [
+		currentCell := (cells select: [:cell | (self at: cell) includes: currentTile]) at: 1.
+		currentTile := ((self at: currentCell) reject: [:tile | tile = currentTile]) at: 1.
+		self put: currentTile at: currentCell
+	].
+
+	self resolveUnpairedSuperpositions!
+
+resolveUnpairedSuperpositions
+	"Private - Run after resolveCycle:atX:y:tile:
+	If there is only one tile of a certain symbol and turn on the board,
+	we know its position, so it can become a classical tile."
+	| counts positions |
+	counts := Dictionary new.
+	positions := Dictionary new.
+
+	board doWithIndex: [:row :y |
+		row doWithIndex: [:cell :x |
+			(cell isMemberOf: OrderedCollection) ifTrue: [
+				cell do: [:tile |
+					counts at: tile put:
+						(counts at: tile ifAbsent: [0]) + 1.
+					positions at: tile put: (Array with: x with: y)
+				]
+			]
+		]
+	].
+	
+	counts keysAndValuesDo: [:eachKey :eachValue |
+		(eachValue = 1) ifTrue: [
+			| pos |
+			pos := positions at: eachKey.
+			self put: eachKey at: pos
+		]
+	]! !
 !QuantumTTTGame categoriesFor: #at:!public! !
 !QuantumTTTGame categoriesFor: #atX:y:!public! !
+!QuantumTTTGame categoriesFor: #board!public! !
 !QuantumTTTGame categoriesFor: #cyclicEntanglementStartingAtX:y:!public! !
 !QuantumTTTGame categoriesFor: #findCyclicEntanglements!public! !
 !QuantumTTTGame categoriesFor: #getSuperpositionPartnerOf:atX:y:!public! !
 !QuantumTTTGame categoriesFor: #initialize!public! !
-!QuantumTTTGame categoriesFor: #isCyclicEntanglementStartingAtX:y:!public! !
+!QuantumTTTGame categoriesFor: #place:at:!private! !
 !QuantumTTTGame categoriesFor: #place:x:y:!private! !
 !QuantumTTTGame categoriesFor: #placeSuperposition:x1:y1:x2:y2:!public! !
+!QuantumTTTGame categoriesFor: #put:at:!private! !
+!QuantumTTTGame categoriesFor: #put:x:y:!public! !
+!QuantumTTTGame categoriesFor: #resolveCycle:atX:y:tile:!public! !
+!QuantumTTTGame categoriesFor: #resolveUnpairedSuperpositions!private! !
 
 !QuantumTTTGame class methodsFor!
 
