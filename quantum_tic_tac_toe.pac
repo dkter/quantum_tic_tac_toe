@@ -58,7 +58,7 @@ printOn: aStream
 	aStream nextPutAll: ')'!
 
 printString
-	^'QuantumTTTTile(' , (symbol printString) , ', turn ' , (turn printString) , ')'!
+	^'a QuantumTTTTile(' , (symbol printString) , ', turn ' , (turn printString) , ')'!
 
 symbol
 	^symbol!
