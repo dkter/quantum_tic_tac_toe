@@ -90,7 +90,7 @@ QuantumTTTGame comment: ''!
 !QuantumTTTGame methodsFor!
 
 at: pos
-	^self atX: (pos at: 1) y: (pos at: 2)!
+	^self atX: (pos x) y: (pos y)!
 
 atX: x y: y
 	^(board at: y) at: x!
@@ -100,9 +100,9 @@ board
 
 cyclicEntanglementStartingAtX: x y: y
 	| initialCell initialTile initialPos currentTile currentPos done entangledCells otherTries |
-	initialPos := Array with: x with: y.
+	initialPos := x@y.
 	initialCell := self atX: x y: y.
-	(QuantumTTTGame isCellSuperposition: initialCell) ifFalse: [^nil].
+	(self class isCellSuperposition: initialCell) ifFalse: [^nil].
 	initialTile := initialCell at: 1.
 	entangledCells := OrderedCollection new.
 	otherTries := OrderedCollection new.
@@ -112,9 +112,9 @@ cyclicEntanglementStartingAtX: x y: y
 	done := false.
 	[done] whileFalse: [
 		| cell tiles |
-		currentPos := self getSuperpositionPartnerOf: currentTile atX: (currentPos at: 1) y: (currentPos at: 2).
+		currentPos := self getSuperpositionPartnerOf: currentTile atX: (currentPos x) y: (currentPos y).
 		cell := self at: currentPos.
-		(QuantumTTTGame isCellSuperposition: cell) ifFalse: [
+		(self class isCellSuperposition: cell) ifFalse: [
 			(otherTries isEmpty) ifTrue: [
 				done := true.
 				^nil
@@ -124,7 +124,7 @@ cyclicEntanglementStartingAtX: x y: y
 				| state |
 				state := otherTries removeFirst.
 				cell := state at: 1.
-				entangledCells := state at: 2
+				entangledCells := state at: 2.
 			]
 		].
 		"If the cell has more than 2 states, pick one and add the rest to a queue, saving the state of entangledCells"
@@ -157,7 +157,7 @@ getSuperpositionPartnerOf: tile atX: x y: y
 			((((ix ~= x) | (iy ~= y))
 			  and: [cell isMemberOf: OrderedCollection])
 			 and: [cell includes: tile]) ifTrue: [
-				^Array with: ix with: iy
+				^ix@iy
 			]
 		]
 	]!
@@ -168,7 +168,7 @@ initialize
 		       with: (Array ofSize: 3).!
 
 place: tile at: pos
-	^self place: tile x: (pos at: 1) y: (pos at: 2)!
+	^self place: tile x: (pos x) y: (pos x)!
 
 place: tile x: x y: y
 	((self atX: x y: y) isMemberOf: OrderedCollection) ifTrue: [
@@ -184,7 +184,7 @@ placeSuperposition: tile x1: x1 y1: y1 x2: x2 y2: y2
 	!
 
 put: tile at: pos
-	^self put: tile x: (pos at: 1) y: (pos at: 2)!
+	^self put: tile x: (pos x) y: (pos y)!
 
 put: tile x: x y: y
 	(board at: y) at: x put: tile!
@@ -224,7 +224,7 @@ resolveUnpairedSuperpositions
 				cell do: [:tile |
 					counts at: tile put:
 						(counts at: tile ifAbsent: [0]) + 1.
-					positions at: tile put: (Array with: x with: y)
+					positions at: tile put: x@y
 				]
 			]
 		]
@@ -248,7 +248,7 @@ resolveUnpairedSuperpositions
 !QuantumTTTGame categoriesFor: #place:x:y:!private! !
 !QuantumTTTGame categoriesFor: #placeSuperposition:x1:y1:x2:y2:!public! !
 !QuantumTTTGame categoriesFor: #put:at:!private! !
-!QuantumTTTGame categoriesFor: #put:x:y:!public! !
+!QuantumTTTGame categoriesFor: #put:x:y:!private! !
 !QuantumTTTGame categoriesFor: #resolveCycle:atX:y:tile:!public! !
 !QuantumTTTGame categoriesFor: #resolveUnpairedSuperpositions!private! !
 
