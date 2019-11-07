@@ -5,7 +5,10 @@ package paxVersion: 1;
 
 
 package classNames
+	add: #QuantumError;
+	add: #QuantumTTTCell;
 	add: #QuantumTTTGame;
+	add: #QuantumTTTShell;
 	add: #QuantumTTTTile;
 	yourself.
 
@@ -17,19 +20,36 @@ package globalAliases: (Set new
 
 package setPrerequisites: (IdentitySet new
 	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\Base\Dolphin';
+	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Presenters\List\Dolphin List Presenter';
+	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Base\Dolphin MVP Base';
 	yourself).
 
 package!
 
 "Class Definitions"!
 
+Object subclass: #QuantumTTTCell
+	instanceVariableNames: 'tiles tile isClassical'
+	classVariableNames: ''
+	poolDictionaries: ''
+	classInstanceVariableNames: ''!
 Object subclass: #QuantumTTTTile
 	instanceVariableNames: 'symbol turn'
 	classVariableNames: ''
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
+Error subclass: #QuantumError
+	instanceVariableNames: ''
+	classVariableNames: ''
+	poolDictionaries: ''
+	classInstanceVariableNames: ''!
 Model subclass: #QuantumTTTGame
 	instanceVariableNames: 'board'
+	classVariableNames: 'BoardSize'
+	poolDictionaries: ''
+	classInstanceVariableNames: ''!
+Shell subclass: #QuantumTTTShell
+	instanceVariableNames: 'boardPresenter tileButtons'
 	classVariableNames: ''
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
@@ -44,6 +64,80 @@ Model subclass: #QuantumTTTGame
 "Source Globals"!
 
 "Classes"!
+
+QuantumTTTCell guid: (GUID fromString: '{7352411E-3C23-4D0B-AD0C-A29F07CBF118}')!
+QuantumTTTCell comment: ''!
+!QuantumTTTCell categoriesForClass!Kernel-Objects! !
+!QuantumTTTCell methodsFor!
+
+add: aTile
+	isClassical ifFalse: [
+		tiles add: aTile
+	]
+	ifTrue: [
+		QuantumError signal: 'Cell is classical and cannot be changed'
+	]!
+
+getOne
+	^tiles at: 1!
+
+hasTwoOrMoreStates
+	^isClassical not and: [tiles size >= 2]!
+
+includes: aTile
+	isClassical ifTrue: [QuantumError signal: 'Cell is classical'].
+	^tiles includes: aTile!
+
+initialize
+	tiles := OrderedCollection new.
+	isClassical := false.!
+
+isClassical
+	^isClassical!
+
+isEmpty
+	^tiles isEmpty!
+
+printOn: aStream
+	isClassical ifTrue: [
+		aStream nextPutAll: '!!('.
+		tile printOn: aStream.
+		aStream nextPut: $).
+	]
+	ifFalse: [
+		aStream nextPutAll: '?('.
+		tiles do: [:eachTile | eachTile printOn: aStream ]
+			  separatedBy: [aStream space].
+		aStream nextPut: $).
+	]!
+
+resolveTo: aTile
+	tile := aTile.
+	isClassical := true.!
+
+tiles
+	isClassical ifTrue: [QuantumError signal: 'Cell is classical'].
+	^tiles! !
+!QuantumTTTCell categoriesFor: #add:!public! !
+!QuantumTTTCell categoriesFor: #getOne!public! !
+!QuantumTTTCell categoriesFor: #hasTwoOrMoreStates!public! !
+!QuantumTTTCell categoriesFor: #includes:!public! !
+!QuantumTTTCell categoriesFor: #initialize!public! !
+!QuantumTTTCell categoriesFor: #isClassical!public! !
+!QuantumTTTCell categoriesFor: #isEmpty!public! !
+!QuantumTTTCell categoriesFor: #printOn:!public! !
+!QuantumTTTCell categoriesFor: #resolveTo:!public! !
+!QuantumTTTCell categoriesFor: #tiles!public! !
+
+!QuantumTTTCell class methodsFor!
+
+new
+	^self basicNew initialize!
+
+with: aTile
+	^self new add: aTile; yourself! !
+!QuantumTTTCell class categoriesFor: #new!public! !
+!QuantumTTTCell class categoriesFor: #with:!public! !
 
 QuantumTTTTile guid: (GUID fromString: '{D6CF5A70-C3DC-484F-BF5B-D74D764FC1F9}')!
 QuantumTTTTile comment: ''!
@@ -84,6 +178,9 @@ symbol: aSymbol turn: anInteger
 	^self new symbol: aSymbol; turn: anInteger; yourself! !
 !QuantumTTTTile class categoriesFor: #symbol:turn:!public! !
 
+QuantumError guid: (GUID fromString: '{B84323DF-C493-4C91-8415-16C271132C21}')!
+QuantumError comment: ''!
+!QuantumError categoriesForClass!Kernel-Exception Handling! !
 QuantumTTTGame guid: (GUID fromString: '{455FD1A1-2BD7-4F4B-84BF-AFEAD5234E2B}')!
 QuantumTTTGame comment: ''!
 !QuantumTTTGame categoriesForClass!MVP-Models! !
@@ -102,8 +199,8 @@ cyclicEntanglementStartingAtX: x y: y
 	| initialCell initialTile initialPos currentTile currentPos done entangledCells otherTries |
 	initialPos := x@y.
 	initialCell := self atX: x y: y.
-	(self class isCellSuperposition: initialCell) ifFalse: [^nil].
-	initialTile := initialCell at: 1.
+	initialCell hasTwoOrMoreStates ifFalse: [^nil].
+	initialTile := initialCell getOne.
 	entangledCells := OrderedCollection new.
 	otherTries := OrderedCollection new.
 
@@ -114,8 +211,8 @@ cyclicEntanglementStartingAtX: x y: y
 		| cell tiles |
 		currentPos := self getSuperpositionPartnerOf: currentTile atX: (currentPos x) y: (currentPos y).
 		cell := self at: currentPos.
-		(self class isCellSuperposition: cell) ifFalse: [
-			(otherTries isEmpty) ifTrue: [
+		cell hasTwoOrMoreStates ifFalse: [
+			otherTries isEmpty ifTrue: [
 				done := true.
 				^nil
 			]
@@ -128,9 +225,9 @@ cyclicEntanglementStartingAtX: x y: y
 			]
 		].
 		"If the cell has more than 2 states, pick one and add the rest to a queue, saving the state of entangledCells"
-		tiles := (cell reject: [:tile | tile = currentTile]).
+		tiles := (cell tiles reject: [:tile | tile = currentTile]).
 		currentTile := tiles removeFirst.
-		(tiles isEmpty) ifFalse: [
+		tiles isEmpty ifFalse: [
 			otherTries add: (Array with: tiles with: (entangledCells copy)).
 		].
 
@@ -155,7 +252,7 @@ getSuperpositionPartnerOf: tile atX: x y: y
 	board doWithIndex: [ :row :iy |
 		row doWithIndex: [ :cell :ix |
 			((((ix ~= x) | (iy ~= y))
-			  and: [cell isMemberOf: OrderedCollection])
+			  and: [cell isClassical not])
 			 and: [cell includes: tile]) ifTrue: [
 				^ix@iy
 			]
@@ -163,20 +260,20 @@ getSuperpositionPartnerOf: tile atX: x y: y
 	]!
 
 initialize
-	board := Array with: (Array ofSize: 3)
-		       with: (Array ofSize: 3)
-		       with: (Array ofSize: 3).!
+	BoardSize := 3.
+	board := Array ofSize: BoardSize.
+	1 to: BoardSize do: [:y |
+		board at: y put: (Array ofSize: BoardSize).
+		1 to: BoardSize do: [:x |
+			(board at: y) at: x put: (QuantumTTTCell new).
+		]
+	]!
 
 place: tile at: pos
 	^self place: tile x: (pos x) y: (pos x)!
 
 place: tile x: x y: y
-	((self atX: x y: y) isMemberOf: OrderedCollection) ifTrue: [
-		((board at: y) at: x) addLast: tile
-	]
-	ifFalse: [
-		(board at: y) at: x put: (OrderedCollection with: tile)
-	]!
+	((board at: y) at: x) add: tile!
 
 placeSuperposition: tile x1: x1 y1: y1 x2: x2 y2: y2
 	self place: tile x: x1 y: y1.
@@ -187,27 +284,30 @@ put: tile at: pos
 	^self put: tile x: (pos x) y: (pos y)!
 
 put: tile x: x y: y
-	(board at: y) at: x put: tile!
+	((board at: y) at: x) resolveTo: tile!
 
 resolveCycle: aCyclicEntanglement atX: x y: y tile: aTile
 	"Given a cyclic entanglement as a list of positions,
 	resolve it so that aTile is a classical tile at (x, y)."
-	| initialCell currentCell currentTile cells |
+
+	| initialCell currentCell currentTile positions |
 	initialCell := self atX: x y: y.
 	currentCell := initialCell.
 	currentTile := aTile.
-	self place: aTile x: x y: y.
-	cells := aCyclicEntanglement.
-
+	self
+		place: aTile
+		x: x
+		y: y.
+	positions := aCyclicEntanglement.
+	
 	[
-		cells := cells reject: [:cell | cell = currentCell].
-		cells isEmpty
+		positions := positions reject: [:cell | cell = currentCell].
+		positions isEmpty
 	] whileFalse: [
-		currentCell := (cells select: [:cell | (self at: cell) includes: currentTile]) at: 1.
-		currentTile := ((self at: currentCell) reject: [:tile | tile = currentTile]) at: 1.
+		currentCell := (positions select: [:cell | (self at: cell) includes: currentTile]) at: 1.
+		currentTile := ((self at: currentCell) tiles reject: [:tile | tile = currentTile]) at: 1.
 		self put: currentTile at: currentCell
 	].
-
 	self resolveUnpairedSuperpositions!
 
 resolveUnpairedSuperpositions
@@ -220,8 +320,8 @@ resolveUnpairedSuperpositions
 
 	board doWithIndex: [:row :y |
 		row doWithIndex: [:cell :x |
-			(cell isMemberOf: OrderedCollection) ifTrue: [
-				cell do: [:tile |
+			cell isClassical ifFalse: [
+				cell tiles do: [:tile |
 					counts at: tile put:
 						(counts at: tile ifAbsent: [0]) + 1.
 					positions at: tile put: x@y
@@ -252,17 +352,40 @@ resolveUnpairedSuperpositions
 !QuantumTTTGame categoriesFor: #resolveCycle:atX:y:tile:!public! !
 !QuantumTTTGame categoriesFor: #resolveUnpairedSuperpositions!private! !
 
-!QuantumTTTGame class methodsFor!
+QuantumTTTShell guid: (GUID fromString: '{9FE1F139-75DF-43A6-99BD-94AAC8701E0A}')!
+QuantumTTTShell comment: ''!
+!QuantumTTTShell categoriesForClass!MVP-Presenters! !
+!QuantumTTTShell methodsFor!
 
-isCellSuperposition: aCell
-	^(aCell isMemberOf: OrderedCollection) and: [aCell size >= 2]!
+createComponents
+	super createComponents.
+	boardPresenter := self add: ListPresenter new name: 'board'.!
 
-isCellSuperpositionOf2Tiles: aCell
-	^(aCell isMemberOf: OrderedCollection) and: [
-		aCell size = 2
-	]! !
-!QuantumTTTGame class categoriesFor: #isCellSuperposition:!public! !
-!QuantumTTTGame class categoriesFor: #isCellSuperpositionOf2Tiles:!public! !
+model: aQuantumTTTGame
+	super model: aQuantumTTTGame.
+	boardPresenter model: (aQuantumTTTGame aspectValue: #board).!
+
+onCellPress: aPoint! !
+!QuantumTTTShell categoriesFor: #createComponents!private! !
+!QuantumTTTShell categoriesFor: #model:!public! !
+!QuantumTTTShell categoriesFor: #onCellPress:!public! !
+
+!QuantumTTTShell class methodsFor!
+
+defaultModel
+	^QuantumTTTGame new!
+
+resource_Default_view
+	"Answer the literal data from which the 'Default view' resource can be reconstituted.
+	DO NOT EDIT OR RECATEGORIZE THIS METHOD.
+
+	If you wish to modify this resource evaluate:
+	ViewComposer openOn: (ResourceIdentifier class: self selector: #resource_Default_view)
+	"
+
+	^#(#'!!STL' 3 788558 10 ##(Smalltalk.STBViewProxy) 8 ##(Smalltalk.ShellView) 98 27 0 0 98 2 26607617 131073 416 0 524550 ##(Smalltalk.ColorRef) 8 4278190080 328198 ##(Smalltalk.Point) 651 691 551 0 0 0 416 0 234 256 98 18 410 8 ##(Smalltalk.PushButton) 98 20 0 416 98 2 8 1140924416 1 592 0 0 0 7 0 0 0 592 0 8 4294902955 1180998 4 ##(Smalltalk.CommandDescription) 0 0 1 1 0 0 32 0 0 0 983302 ##(Smalltalk.MessageSequence) 202 208 98 1 721670 ##(Smalltalk.MessageSend) 8 #createAt:extent: 98 2 530 21 217 530 181 181 592 983302 ##(Smalltalk.WINDOWPLACEMENT) 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 10 0 0 0 108 0 0 0 100 0 0 0 198 0 0 0] 98 0 530 193 193 0 29 8 'cell12' 410 608 98 20 0 416 98 2 8 1140924416 1 976 0 0 0 7 0 0 0 976 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 421 417 530 181 181 976 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 208 0 0 0 44 1 0 0 42 1 0 0] 98 0 944 0 29 8 'cell33' 410 608 98 20 0 416 98 2 8 1140924416 1 1248 0 0 0 7 0 0 0 1248 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 421 17 530 181 181 1248 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 8 0 0 0 44 1 0 0 98 0 0 0] 98 0 944 0 29 8 'cell31' 410 608 98 20 0 416 98 2 8 1140924416 1 1520 0 0 0 7 0 0 0 1520 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 17 19 530 181 181 1520 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 8 0 0 0 9 0 0 0 98 0 0 0 99 0 0 0] 98 0 944 0 29 8 'cell11' 410 608 98 20 0 416 98 2 8 1140924416 1 1792 0 0 0 7 0 0 0 1792 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 221 217 530 181 181 1792 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 108 0 0 0 200 0 0 0 198 0 0 0] 98 0 944 0 29 8 'cell22' 410 608 98 20 0 416 98 2 8 1140924416 1 2064 0 0 0 7 0 0 0 2064 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 21 417 530 181 181 2064 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 10 0 0 0 208 0 0 0 100 0 0 0 42 1 0 0] 98 0 944 0 29 8 'cell13' 410 608 98 20 0 416 98 2 8 1140924416 1 2336 0 0 0 7 0 0 0 2336 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 221 17 530 181 181 2336 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 8 0 0 0 200 0 0 0 98 0 0 0] 98 0 944 0 29 8 'cell21' 410 608 98 20 0 416 98 2 8 1140924416 1 2608 0 0 0 7 0 0 0 2608 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 421 217 530 181 181 2608 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 108 0 0 0 44 1 0 0 198 0 0 0] 98 0 944 0 29 8 'cell32' 410 608 98 20 0 416 98 2 8 1140924416 1 2880 0 0 0 7 0 0 0 2880 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 221 417 530 181 181 2880 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 208 0 0 0 200 0 0 0 42 1 0 0] 98 0 944 0 29 8 'cell23' 0 0 0 0 0 1 0 0 0 0 1 0 0 722 202 208 98 2 786 816 98 2 530 3839 21 530 651 691 416 786 8 #updateMenuBar 98 0 416 882 8 #[44 0 0 0 0 0 0 0 0 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 127 7 0 0 10 0 0 0 196 8 0 0 99 1 0 0] 98 9 1520 592 2064 2336 1792 2880 1248 2608 976 944 0 27 )! !
+!QuantumTTTShell class categoriesFor: #defaultModel!public! !
+!QuantumTTTShell class categoriesFor: #resource_Default_view!public!resources-views! !
 
 "Binary Globals"!
 
