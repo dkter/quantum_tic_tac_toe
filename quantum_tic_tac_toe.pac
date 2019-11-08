@@ -60,7 +60,7 @@ Model subclass: #QuantumTTTGame
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
 Shell subclass: #QuantumTTTShell
-	instanceVariableNames: 'currentSymbol currentTurn superposition cells cycle gameOver'
+	instanceVariableNames: 'currentSymbol currentTurn superposition cells cycle gameOver selectedCell'
 	classVariableNames: ''
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
@@ -520,13 +520,15 @@ QuantumTTTShell comment: ''!
 
 addToSuperposition: aPoint
 	superposition add: aPoint.
-	superposition size = 2 ifTrue: [
-		self placeSuperposition.
-		self advanceTurn.
-		superposition := OrderedCollection new.
-		self checkCycle.
-		self updateCells.
-	]!
+	superposition size = 2
+		ifFalse: [selectedCell := aPoint]
+		ifTrue: [
+			self placeSuperposition.
+			self advanceTurn.
+			superposition := OrderedCollection new.
+			self checkCycle.
+			self updateCells.
+		]!
 
 advanceTurn
 	currentSymbol = #X ifTrue: [
@@ -536,6 +538,9 @@ advanceTurn
 		currentSymbol := #X.
 		currentTurn := currentTurn + 1.
 	]!
+
+btnAt: point
+	^(cells at: point x) at: point y!
 
 checkCycle
 	cycle := self model findCyclicEntanglements.!
@@ -581,7 +586,8 @@ placeSuperposition
 	tile := QuantumTTTTile symbol: currentSymbol turn: currentTurn.
 	self model placeSuperposition: tile
 			   pos1: (superposition at: 1)
-			   pos2: (superposition at: 2)!
+			   pos2: (superposition at: 2).
+	selectedCell := nil!
 
 queryCommand: aCommandQuery
 	super queryCommand: aCommandQuery.
@@ -599,6 +605,9 @@ queryCommand: aCommandQuery
 				aCommandQuery isEnabled: false.
 			]
 		].
+
+		"If the cell is selected, disable it so it can't be selected again."
+		pos = selectedCell ifTrue: [aCommandQuery isEnabled: false].
 		
 		"If the game is over, disable everything."
 		gameOver ifTrue: [aCommandQuery isEnabled: false].
@@ -650,6 +659,7 @@ updateStatus
 	status text: stream contents! !
 !QuantumTTTShell categoriesFor: #addToSuperposition:!public! !
 !QuantumTTTShell categoriesFor: #advanceTurn!public! !
+!QuantumTTTShell categoriesFor: #btnAt:!public! !
 !QuantumTTTShell categoriesFor: #checkCycle!public! !
 !QuantumTTTShell categoriesFor: #checkGameOver!public! !
 !QuantumTTTShell categoriesFor: #createComponents!private! !
