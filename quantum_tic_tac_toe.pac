@@ -5,8 +5,8 @@ package paxVersion: 1;
 
 package imageStripperBytes: (ByteArray fromBase64String: 'IVNUQiAzIEYPDQAEAAAASW1hZ2VTdHJpcHBlcgAAAABSAAAAEwAAAHF1YW50dW1fdGljX3RhY190
 b2VSAAAAPgAAAEM6XFVzZXJzXGRrdGVyXGJpZ19wcm9qZWN0c1xxdWFudHVtX3RpY190YWNfdG9l
-XHF1YW50dW10dHQuZXhlmgAAALABAABSAAAADwAAAFF1YW50dW1UVFRTaGVsbO+/JQAAAAAAAAAA
-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA').
+XHF1YW50dW10dHQuZXhlmgAAAFIAAAATAAAAcXVhbnR1bV90aWNfdGFjX3RvZVIAAAAPAAAAUXVh
+bnR1bVRUVFNoZWxs778lAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=').
 
 package classNames
 	add: #ButtonPresenter;
@@ -143,6 +143,12 @@ printOn: aStream
 		aStream nextPut: $).
 	]!
 
+reject: aBlock
+	^self class with: (self tiles reject: aBlock)!
+
+removeFirst
+	^tiles removeFirst at: 1!
+
 resolveTo: aTile
 	tile := aTile.
 	isClassical := true.!
@@ -152,7 +158,10 @@ tile
 
 tiles
 	isClassical ifTrue: [QuantumError signal: 'Cell is classical'].
-	^tiles! !
+	^tiles!
+
+tiles: anOrderedCollection
+	tiles := anOrderedCollection.! !
 !QuantumTTTCell categoriesFor: #add:!public! !
 !QuantumTTTCell categoriesFor: #cellString!public! !
 !QuantumTTTCell categoriesFor: #getOne!public! !
@@ -162,9 +171,12 @@ tiles
 !QuantumTTTCell categoriesFor: #isClassical!public! !
 !QuantumTTTCell categoriesFor: #isEmpty!public! !
 !QuantumTTTCell categoriesFor: #printOn:!public! !
+!QuantumTTTCell categoriesFor: #reject:!public! !
+!QuantumTTTCell categoriesFor: #removeFirst!public! !
 !QuantumTTTCell categoriesFor: #resolveTo:!public! !
 !QuantumTTTCell categoriesFor: #tile!public! !
 !QuantumTTTCell categoriesFor: #tiles!public! !
+!QuantumTTTCell categoriesFor: #tiles:!private! !
 
 !QuantumTTTCell class methodsFor!
 
@@ -172,9 +184,13 @@ new
 	^self basicNew initialize!
 
 with: aTile
-	^self new add: aTile; yourself! !
+	^self new add: aTile; yourself!
+
+withTiles: anOrderedCollection
+	^self new; tiles: anOrderedCollection; yourself.! !
 !QuantumTTTCell class categoriesFor: #new!public! !
 !QuantumTTTCell class categoriesFor: #with:!public! !
+!QuantumTTTCell class categoriesFor: #withTiles:!private! !
 
 QuantumTTTTile guid: (GUID fromString: '{D6CF5A70-C3DC-484F-BF5B-D74D764FC1F9}')!
 QuantumTTTTile comment: ''!
@@ -318,46 +334,51 @@ checkThreeInARow
 	^false!
 
 cyclicEntanglementStartingAtX: x y: y
-	| initialCell initialTile initialPos currentTile currentPos done entangledCells otherTries |
-	initialPos := x@y.
+	| initialCell initialTile initialPos currentTile currentPos done entangledPositions otherTries |
+	initialPos := x @ y.
 	initialCell := self atX: x y: y.
 	initialCell hasTwoOrMoreStates ifFalse: [^nil].
 	initialTile := initialCell getOne.
-	entangledCells := OrderedCollection new.
+	entangledPositions := OrderedCollection new.
 	otherTries := OrderedCollection new.
-
 	currentTile := initialTile.
 	currentPos := initialPos.
 	done := false.
 	[done] whileFalse: [
-		| cell tiles |
-		currentPos := self getSuperpositionPartnerOf: currentTile atX: (currentPos x) y: (currentPos y).
+		| cell newCell |
+		self halt.
+		currentPos := self
+					getSuperpositionPartnerOf: currentTile
+					atX: currentPos x
+					y: currentPos y.
 		cell := self at: currentPos.
 		cell hasTwoOrMoreStates ifFalse: [
-			otherTries isEmpty ifTrue: [
-				done := true.
-				^nil
-			]
-			ifFalse: [
-				"The search hit a dead end, time to backtrack"
-				| state |
-				state := otherTries removeFirst.
-				cell := state at: 1.
-				entangledCells := state at: 2.
-			]
+			otherTries isEmpty
+				ifTrue: [
+					done := true.
+					^nil
+				]
+				ifFalse: [
+					"The search hit a dead end, time to backtrack"
+					| state |
+					self halt.
+					state := otherTries removeFirst.
+					cell := state at: 1.
+					entangledPositions := state at: 2
+				]
 		].
 		"If the cell has more than 2 states, pick one and add the rest to a queue, saving the state of entangledCells"
-		tiles := (cell tiles reject: [:tile | tile = currentTile]).
-		currentTile := tiles removeFirst.
-		tiles isEmpty ifFalse: [
-			otherTries add: (Array with: tiles with: (entangledCells copy)).
+		newCell := cell reject: [:tile | tile = currentTile].
+		currentTile := newCell removeFirst.
+		newCell isEmpty ifFalse: [
+			otherTries add: (Array with: newCell with: entangledPositions copy)
 		].
-
-		entangledCells add: currentPos.
-		(currentTile = initialTile) ifTrue: [
-			done := true.
-			^entangledCells
-		]
+		entangledPositions add: currentPos.
+		currentTile = initialTile
+			ifTrue: [
+				done := true.
+				^entangledPositions
+			]
 	]!
 
 findCyclicEntanglements
