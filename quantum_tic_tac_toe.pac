@@ -419,13 +419,13 @@ resolveCycle: aCyclicEntanglement atX: x y: y tile: aTile
 	currentCell := initialCell.
 	currentTile := aTile.
 	self
-		place: aTile
+		put: aTile
 		x: x
 		y: y.
 	positions := aCyclicEntanglement.
 	
 	[
-		positions := positions reject: [:cell | cell = currentCell].
+		positions := positions reject: [:pos | (self at: pos) = currentCell or: [(self at: pos) isClassical]].
 		positions isEmpty
 	] whileFalse: [
 		currentCell := (positions select: [:cell | (self at: cell) includes: currentTile]) at: 1.
