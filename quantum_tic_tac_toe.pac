@@ -112,7 +112,8 @@ cellString
 
 clear
 	isClassical := false.
-	tiles := OrderedCollection new.!
+	tiles := OrderedCollection new.
+!
 
 getOne
 	^tiles at: 1!
@@ -136,15 +137,13 @@ isEmpty
 
 printOn: aStream
 	isClassical ifTrue: [
-		aStream nextPutAll: '!!('.
-		tile printOn: aStream.
-		aStream nextPut: $).
+		aStream nextPutAll: (tile cellString)
 	]
 	ifFalse: [
-		aStream nextPutAll: '?('.
+		aStream nextPutAll: $[.
 		tiles do: [:eachTile | eachTile printOn: aStream ]
 			  separatedBy: [aStream space].
-		aStream nextPut: $).
+		aStream nextPut: $].
 	]!
 
 reject: aBlock
@@ -206,14 +205,7 @@ cellString
 	^(symbol asString),(turn printString)!
 
 printOn: aStream
-	aStream nextPutAll: 'a QuantumTTTTile('.
-	symbol printOn: aStream.
-	aStream  nextPutAll: ', turn '.
-	turn printOn: aStream.
-	aStream nextPutAll: ')'!
-
-printString
-	^'a QuantumTTTTile(' , (symbol printString) , ', turn ' , (turn printString) , ')'!
+	aStream nextPutAll: self cellString.!
 
 symbol
 	^symbol!
@@ -228,7 +220,6 @@ turn: anInteger
 	turn := anInteger! !
 !QuantumTTTTile categoriesFor: #cellString!public! !
 !QuantumTTTTile categoriesFor: #printOn:!public! !
-!QuantumTTTTile categoriesFor: #printString!public! !
 !QuantumTTTTile categoriesFor: #symbol!public! !
 !QuantumTTTTile categoriesFor: #symbol:!private! !
 !QuantumTTTTile categoriesFor: #turn!public! !
