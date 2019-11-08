@@ -346,7 +346,6 @@ cyclicEntanglementStartingAtX: x y: y
 	done := false.
 	[done] whileFalse: [
 		| cell newCell |
-		self halt.
 		currentPos := self
 					getSuperpositionPartnerOf: currentTile
 					atX: currentPos x
@@ -466,10 +465,12 @@ resolveCycle: aCyclicEntanglement atX: x y: y tile: aTile
 resolveUnpairedSuperpositions
 	"Private - Run after resolveCycle:atX:y:tile:
 	If there is only one tile of a certain symbol and turn on the board,
-	we know its position, so it can become a classical tile."
-	| counts positions |
+	we know its position, so it can become a classical tile.
+	If its pair is classical we know it's not there."
+	| counts positions classical |
 	counts := Dictionary new.
 	positions := Dictionary new.
+	classical := OrderedCollection new.
 
 	board doWithIndex: [:row :y |
 		row doWithIndex: [:cell :x |
@@ -480,11 +481,14 @@ resolveUnpairedSuperpositions
 					positions at: tile put: x@y
 				]
 			]
+			ifTrue: [
+				classical add: (cell tile)
+			]
 		]
 	].
 	
 	counts keysAndValuesDo: [:eachKey :eachValue |
-		(eachValue = 1) ifTrue: [
+		(eachValue = 1 and: [(classical includes: eachKey) not]) ifTrue: [
 			| pos |
 			pos := positions at: eachKey.
 			self put: eachKey at: pos
