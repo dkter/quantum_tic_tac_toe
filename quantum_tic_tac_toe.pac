@@ -52,7 +52,7 @@ Model subclass: #QuantumTTTGame
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
 Shell subclass: #QuantumTTTShell
-	instanceVariableNames: 'currentSymbol currentTurn superposition cells cycle'
+	instanceVariableNames: 'currentSymbol currentTurn superposition cells cycle gameOver'
 	classVariableNames: ''
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
@@ -139,6 +139,9 @@ resolveTo: aTile
 	tile := aTile.
 	isClassical := true.!
 
+tile
+	^tile!
+
 tiles
 	isClassical ifTrue: [QuantumError signal: 'Cell is classical'].
 	^tiles! !
@@ -152,6 +155,7 @@ tiles
 !QuantumTTTCell categoriesFor: #isEmpty!public! !
 !QuantumTTTCell categoriesFor: #printOn:!public! !
 !QuantumTTTCell categoriesFor: #resolveTo:!public! !
+!QuantumTTTCell categoriesFor: #tile!public! !
 !QuantumTTTCell categoriesFor: #tiles!public! !
 
 !QuantumTTTCell class methodsFor!
@@ -223,6 +227,87 @@ atX: x y: y
 
 board
 	^board!
+
+checkGameOver
+	"If someone won or 8+ cells are filled, the game is over"
+	| filledCells |
+	self checkThreeInARow ifTrue: [^true].
+	
+	filledCells := 0.
+	board do: [:row |
+		row do: [:cell |
+			cell isClassical ifTrue: [filledCells := filledCells + 1]
+		]
+	].
+	^filledCells >= 8
+	!
+
+checkThreeInARow
+	"Check rows"
+	board do: [:row |
+		| rowFound |
+		rowFound := (
+			row conform: [:cell | cell isClassical and: [cell tile symbol = #X]]
+		) or: [
+			row conform: [:cell | cell isClassical and: [cell tile symbol = #O]]
+		].
+		
+		rowFound ifTrue: [^true]
+	].
+
+	"Check cols"
+	1 to: (board size) do: [:y |
+		| colFound |
+		colFound  := (
+			(1 to: (board size)) conform: [:x |
+				| cell |
+				cell := self atX: x y: y.
+				cell isClassical and: [cell tile symbol = #X]
+			]
+		) or: [
+			(1 to: (board size)) conform: [:x |
+				| cell |
+				cell := self atX: x y: y.
+				cell isClassical and: [cell tile symbol = #O]
+			]
+		].
+
+		colFound ifTrue: [^true]
+	].
+
+	"Check diagonals"
+	[
+		| diagFound |
+		diagFound := (((
+			(1 to: (board size)) conform: [:x |
+				| cell |
+				cell := self atX: x y: x.
+				cell isClassical and: [cell tile symbol = #X]
+			]
+		) or: [
+			(1 to: (board size)) conform: [:x |
+				| cell |
+				cell := self atX: x y: x.
+				cell isClassical and: [cell tile symbol = #O]
+			]
+		]) or: [
+			(1 to: (board size)) conform: [:x |
+				| cell |
+				cell := self atX: x y: (board size - x + 1).
+				cell isClassical and: [cell tile symbol = #O]
+			]
+		]) or: [
+			(1 to: (board size)) conform: [:x |
+				| cell |
+				cell := self atX: x y: (board size - x + 1).
+				cell isClassical and: [cell tile symbol = #O]
+			]
+		].
+
+		diagFound ifTrue: [^true]
+	] value.
+
+	^false!
 
 cyclicEntanglementStartingAtX: x y: y
 	| initialCell initialTile initialPos currentTile currentPos done entangledCells otherTries |
@@ -379,6 +464,8 @@ resolveUnpairedSuperpositions
 !QuantumTTTGame categoriesFor: #at:!public! !
 !QuantumTTTGame categoriesFor: #atX:y:!public! !
 !QuantumTTTGame categoriesFor: #board!public! !
+!QuantumTTTGame categoriesFor: #checkGameOver!public! !
+!QuantumTTTGame categoriesFor: #checkThreeInARow!public! !
 !QuantumTTTGame categoriesFor: #cyclicEntanglementStartingAtX:y:!public! !
 !QuantumTTTGame categoriesFor: #findCyclicEntanglements!public! !
 !QuantumTTTGame categoriesFor: #getSuperpositionPartnerOf:atX:y:!public! !
@@ -419,12 +506,17 @@ advanceTurn
 checkCycle
 	cycle := self model findCyclicEntanglements.!
 
+checkGameOver
+	"If someone won or 8+ cells are filled, the game is over"
+	^self model checkGameOver!
+
 createComponents
 	super createComponents.
 	currentSymbol := #X.
 	currentTurn := 1.
 	superposition := OrderedCollection new.
 	cycle := nil.
+	gameOver := false.
 	cells := Array
 		with: (Array with: 'cell11' with: 'cell12' with: 'cell13')
 		with: (Array with: 'cell21' with: 'cell22' with: 'cell23')
@@ -443,6 +535,7 @@ onCellPress: aPoint
 	ifFalse: [
 		self resolveCycle: aPoint.
 	].
+	gameOver := self checkGameOver.
 	self updateStatus!
 
 onViewActivated: anEvent
@@ -455,6 +548,27 @@ placeSuperposition
 	self model placeSuperposition: tile
 			   pos1: (superposition at: 1)
 			   pos2: (superposition at: 2)!
+
+queryCommand: aCommandQuery
+	super queryCommand: aCommandQuery.
+	(aCommandQuery command asSymbol = #onCellPress:) ifTrue: [
+		| pos cell |
+		pos := aCommandQuery command arguments at: 1.
+		cell := self model at: pos.
+
+		"If the cell is classical, disable it since it can't be changed."
+		aCommandQuery isEnabled: cell isClassical not.
+
+		"If we're collapsing a cycle, disable the rest of the cells."
+		cycle = nil ifFalse: [
+			(cycle includes: pos) ifFalse: [
+				aCommandQuery isEnabled: false.
+			]
+		].
+		
+		"If the game is over, disable everything."
+		gameOver ifTrue: [aCommandQuery isEnabled: false].
+	]!
 
 resolveCycle: aPoint
 	| tile |
@@ -471,7 +585,6 @@ updateCells
 			btnName := (cells at: ix) at: iy.
 			btn := self view viewNamed: btnName.
 			btn text: (cell cellString).
-			btn isEnabled: (cell isClassical).
 		]
 	]!
 
@@ -479,31 +592,38 @@ updateStatus
 	| status stream |
 	status := self view viewNamed: 'status'.
 	stream := String new writeStream.
-
-	cycle = nil ifTrue: [
-		stream
-			nextPutAll: (currentSymbol asString);
-			nextPutAll: '''s turn ';
-			nextPutAll: (currentTurn printString);
-			nextPutAll: '. Select two cells to play. (';
-			nextPutAll: (superposition size printString);
-			nextPutAll: '/2)'.
+	
+	gameOver ifTrue: [
+		stream nextPutAll: 'Game over'.
 	]
 	ifFalse: [
-		stream
-			nextPutAll: (currentSymbol asString);
-			nextPutAll: '''s turn. Select a cell to collapse'
+		cycle = nil ifTrue: [
+			stream
+				nextPutAll: (currentSymbol asString);
+				nextPutAll: '''s turn ';
+				nextPutAll: (currentTurn printString);
+				nextPutAll: '. Select two cells to play. (';
+				nextPutAll: (superposition size printString);
+				nextPutAll: '/2)'.
+		]
+		ifFalse: [
+			stream
+				nextPutAll: (currentSymbol asString);
+				nextPutAll: '''s turn. Select a cell to collapse'
+		].
 	].
 
 	status text: stream contents! !
 !QuantumTTTShell categoriesFor: #addToSuperposition:!public! !
 !QuantumTTTShell categoriesFor: #advanceTurn!public! !
 !QuantumTTTShell categoriesFor: #checkCycle!public! !
+!QuantumTTTShell categoriesFor: #checkGameOver!public! !
 !QuantumTTTShell categoriesFor: #createComponents!private! !
 !QuantumTTTShell categoriesFor: #model:!public! !
 !QuantumTTTShell categoriesFor: #onCellPress:!public! !
 !QuantumTTTShell categoriesFor: #onViewActivated:!public! !
 !QuantumTTTShell categoriesFor: #placeSuperposition!public! !
+!QuantumTTTShell categoriesFor: #queryCommand:!public! !
 !QuantumTTTShell categoriesFor: #resolveCycle:!public! !
 !QuantumTTTShell categoriesFor: #updateCells!public! !
 !QuantumTTTShell categoriesFor: #updateStatus!public! !
@@ -521,7 +641,7 @@ resource_Default_view
 	ViewComposer openOn: (ResourceIdentifier class: self selector: #resource_Default_view)
 	"
 
-	^#(#'!!STL' 3 788558 10 ##(Smalltalk.STBViewProxy) 8 ##(Smalltalk.ShellView) 98 27 0 0 98 2 26607617 131073 416 0 524550 ##(Smalltalk.ColorRef) 8 4278190080 328198 ##(Smalltalk.Point) 661 771 551 0 0 0 416 656198 1 ##(Smalltalk.FlowLayout) 1 1 1 234 256 98 0 0 0 0 0 0 1 0 0 0 0 1 0 0 983302 ##(Smalltalk.MessageSequence) 202 208 98 2 721670 ##(Smalltalk.MessageSend) 8 #createAt:extent: 98 2 530 3839 21 530 661 771 416 690 8 #updateMenuBar 608 416 983302 ##(Smalltalk.WINDOWPLACEMENT) 8 #[44 0 0 0 0 0 0 0 0 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 127 7 0 0 10 0 0 0 201 8 0 0 139 1 0 0] 98 1 410 8 ##(Smalltalk.ContainerView) 98 15 0 416 98 2 8 1140850688 131073 880 0 0 0 7 0 0 0 880 0 234 256 98 2 410 8 ##(Smalltalk.StatusBar) 98 18 0 880 98 2 8 1409288204 1 992 0 482 8 4278190080 0 7 0 263174 ##(Smalltalk.Font) 0 16 459014 ##(Smalltalk.LOGFONT) 8 #[243 255 255 255 0 0 0 0 0 0 0 0 0 0 0 0 144 1 0 0 0 0 0 0 3 2 1 34 65 114 105 97 108 0 159 4 0 134 63 1 0 0 204 53 63 1 2 0 20 59 0 0 0 0 247 0 5 86 111 1] 530 193 193 0 992 0 8 4294911845 234 256 98 2 410 8 ##(Smalltalk.StaticText) 98 16 0 992 98 2 8 1140850944 65 1248 0 0 0 7 0 0 0 1248 0 8 4294915395 852486 ##(Smalltalk.NullConverter) 0 0 0 626 202 208 98 2 690 720 98 2 530 1 1 530 631 37 1248 690 8 #text: 98 1 8 'Quantum Tic Tac Toe' 1248 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 0 0 0 0 59 1 0 0 18 0 0 0] 98 0 530 193 193 0 27 8 'status' 98 1 853766 ##(Smalltalk.StatusBarItem) 1 -1 992 0 459270 ##(Smalltalk.Message) 8 #displayString 98 0 1682 8 #iconImageIndex 98 0 1049926 1 ##(Smalltalk.IconImageManager) 1115142 ##(Smalltalk.StatusBarNullItem) 513 1 992 0 562 1 1 1 626 202 208 98 1 690 720 98 2 530 1 653 530 661 41 992 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 70 1 0 0 74 1 0 0 90 1 0 0] 98 1 1248 1600 0 27 8 'statusBar' 0 626 202 208 98 1 690 720 98 2 530 1 1 530 661 693 880 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 0 0 0 0 74 1 0 0 90 1 0 0] 98 2 410 896 98 15 0 880 98 2 8 1140850688 131073 2208 0 0 0 7 0 0 0 2208 656390 ##(Smalltalk.GridLayout) 7 7 11 11 234 256 98 18 410 8 ##(Smalltalk.PushButton) 98 20 0 2208 98 2 8 1140924416 1 2336 0 0 0 7 0 0 0 2336 0 8 4294911001 1180998 4 ##(Smalltalk.CommandDescription) 1682 8 #onCellPress: 98 1 530 5 3 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 1 213 530 201 205 2336 690 8 #isEnabled: 98 1 32 2336 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 106 0 0 0 100 0 0 0 208 0 0 0] 98 0 1600 0 29 8 'cell21' 410 2352 98 20 0 2208 98 2 8 1140924416 1 2752 0 0 0 7 0 0 0 2752 0 8 4294911001 2434 1682 2480 98 1 530 7 7 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 421 427 530 201 203 2752 690 2656 98 1 32 2752 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 213 0 0 0 54 1 0 0 58 1 0 0] 98 0 1600 0 29 8 'cell33' 410 2352 98 20 0 2208 98 2 8 1140924416 1 3104 0 0 0 7 0 0 0 3104 0 8 4294911001 2434 1682 2480 98 1 530 5 7 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 421 213 530 201 205 3104 690 2656 98 1 32 3104 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 106 0 0 0 54 1 0 0 208 0 0 0] 98 0 1600 0 29 8 'cell23' 410 2352 98 20 0 2208 98 2 8 1140924416 1 3456 0 0 0 7 0 0 0 3456 0 8 4294911001 2434 1682 2480 98 1 530 3 3 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 1 1 530 201 203 3456 690 2656 98 1 32 3456 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 0 0 0 0 100 0 0 0 101 0 0 0] 98 0 1600 0 29 8 'cell11' 410 2352 98 20 0 2208 98 2 8 1140924416 1 3808 0 0 0 7 0 0 0 3808 0 8 4294911001 2434 1682 2480 98 1 530 7 3 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 1 427 530 201 203 3808 690 2656 98 1 32 3808 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 213 0 0 0 100 0 0 0 58 1 0 0] 98 0 1600 0 29 8 'cell31' 410 2352 98 20 0 2208 98 2 8 1140924416 1 4160 0 0 0 7 0 0 0 4160 0 8 4294911001 2434 1682 2480 98 1 530 5 5 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 211 213 530 201 205 4160 690 2656 98 1 32 4160 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 105 0 0 0 106 0 0 0 205 0 0 0 208 0 0 0] 98 0 1600 0 29 8 'cell22' 410 2352 98 20 0 2208 98 2 8 1140924416 1 4512 0 0 0 7 0 0 0 4512 0 8 4294911001 2434 1682 2480 98 1 530 7 5 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 211 427 530 201 203 4512 690 2656 98 1 32 4512 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 105 0 0 0 213 0 0 0 205 0 0 0 58 1 0 0] 98 0 1600 0 29 8 'cell32' 410 2352 98 20 0 2208 98 2 8 1140924416 1 4864 0 0 0 7 0 0 0 4864 0 8 4294911001 2434 1682 2480 98 1 530 3 7 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 421 1 530 201 203 4864 690 2656 98 1 32 4864 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 0 0 0 0 54 1 0 0 101 0 0 0] 98 0 1600 0 29 8 'cell13' 410 2352 98 20 0 2208 98 2 8 1140924416 1 5216 0 0 0 7 0 0 0 5216 0 8 4294911001 2434 1682 2480 98 1 530 3 5 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 211 1 530 201 203 5216 690 2656 98 1 32 5216 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 105 0 0 0 0 0 0 0 205 0 0 0 101 0 0 0] 98 0 1600 0 29 8 'cell12' 0 626 202 208 98 1 690 720 98 2 530 5 5 530 621 629 2208 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 2 0 0 0 2 0 0 0 56 1 0 0 60 1 0 0] 98 9 3456 5216 4864 2336 4160 3104 3808 4512 2752 1600 0 27 992 1600 0 27 1600 0 27 )! !
+	^#(#'!!STL' 3 788558 10 ##(Smalltalk.STBViewProxy) 8 ##(Smalltalk.ShellView) 98 27 0 0 98 2 26607617 131073 416 0 524550 ##(Smalltalk.ColorRef) 8 4278190080 328198 ##(Smalltalk.Point) 661 771 551 0 0 0 416 656198 1 ##(Smalltalk.FlowLayout) 1 1 1 234 256 98 0 0 0 0 0 0 1 0 0 0 0 1 0 0 983302 ##(Smalltalk.MessageSequence) 202 208 98 2 721670 ##(Smalltalk.MessageSend) 8 #createAt:extent: 98 2 530 3839 21 530 661 771 416 690 8 #updateMenuBar 608 416 983302 ##(Smalltalk.WINDOWPLACEMENT) 8 #[44 0 0 0 0 0 0 0 0 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 127 7 0 0 10 0 0 0 201 8 0 0 139 1 0 0] 98 1 410 8 ##(Smalltalk.ContainerView) 98 15 0 416 98 2 8 1140850688 131073 880 0 0 0 7 0 0 0 880 0 234 256 98 2 410 8 ##(Smalltalk.StatusBar) 98 18 0 880 98 2 8 1409288204 1 992 0 482 8 4278190080 0 7 0 263174 ##(Smalltalk.Font) 0 16 459014 ##(Smalltalk.LOGFONT) 8 #[243 255 255 255 0 0 0 0 0 0 0 0 0 0 0 0 144 1 0 0 0 0 0 0 3 2 1 34 65 114 105 97 108 0 159 4 0 134 63 1 0 0 204 53 63 1 2 0 20 59 0 0 0 0 247 0 5 86 111 1] 530 193 193 0 992 0 8 4294904727 234 256 98 2 410 8 ##(Smalltalk.StaticText) 98 16 0 992 98 2 8 1140850944 65 1248 0 0 0 7 0 0 0 1248 0 8 4294904859 852486 ##(Smalltalk.NullConverter) 0 0 0 626 202 208 98 2 690 720 98 2 530 1 1 530 631 37 1248 690 8 #text: 98 1 8 'Quantum Tic Tac Toe' 1248 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 0 0 0 0 59 1 0 0 18 0 0 0] 98 0 530 193 193 0 27 8 'status' 98 1 853766 ##(Smalltalk.StatusBarItem) 1 -1 992 0 459270 ##(Smalltalk.Message) 8 #displayString 98 0 1682 8 #iconImageIndex 98 0 1049926 1 ##(Smalltalk.IconImageManager) 1115142 ##(Smalltalk.StatusBarNullItem) 513 1 992 0 562 1 1 1 626 202 208 98 1 690 720 98 2 530 1 653 530 661 41 992 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 70 1 0 0 74 1 0 0 90 1 0 0] 98 1 1248 1600 0 27 8 'statusBar' 0 626 202 208 98 1 690 720 98 2 530 1 1 530 661 693 880 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 0 0 0 0 74 1 0 0 90 1 0 0] 98 2 410 896 98 15 0 880 98 2 8 1140850688 131073 2208 0 0 0 7 0 0 0 2208 656390 ##(Smalltalk.GridLayout) 7 7 11 11 234 256 98 18 410 8 ##(Smalltalk.PushButton) 98 20 0 2208 98 2 8 1140924416 1 2336 0 0 0 7 0 0 0 2336 0 8 4294904739 1180998 4 ##(Smalltalk.CommandDescription) 1682 8 #onCellPress: 98 1 530 5 3 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 1 213 530 201 205 2336 690 8 #isEnabled: 98 1 32 2336 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 106 0 0 0 100 0 0 0 208 0 0 0] 98 0 1600 0 29 8 'cell21' 410 2352 98 20 0 2208 98 2 8 1140924416 1 2752 0 0 0 7 0 0 0 2752 0 8 4294904739 2434 1682 2480 98 1 530 7 7 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 421 427 530 201 203 2752 690 2656 98 1 32 2752 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 213 0 0 0 54 1 0 0 58 1 0 0] 98 0 1600 0 29 8 'cell33' 410 2352 98 20 0 2208 98 2 8 1140924416 1 3104 0 0 0 7 0 0 0 3104 0 8 4294904739 2434 1682 2480 98 1 530 5 7 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 421 213 530 201 205 3104 690 2656 98 1 32 3104 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 106 0 0 0 54 1 0 0 208 0 0 0] 98 0 1600 0 29 8 'cell23' 410 2352 98 20 0 2208 98 2 8 1140924416 1 3456 0 0 0 7 0 0 0 3456 0 8 4294904739 2434 1682 2480 98 1 530 3 3 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 1 1 530 201 203 3456 690 2656 98 1 32 3456 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 0 0 0 0 100 0 0 0 101 0 0 0] 98 0 1600 0 29 8 'cell11' 410 2352 98 20 0 2208 98 2 8 1140924416 1 3808 0 0 0 7 0 0 0 3808 0 8 4294904739 2434 1682 2480 98 1 530 7 3 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 1 427 530 201 203 3808 690 2656 98 1 32 3808 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 0 0 0 0 213 0 0 0 100 0 0 0 58 1 0 0] 98 0 1600 0 29 8 'cell31' 410 2352 98 20 0 2208 98 2 8 1140924416 1 4160 0 0 0 7 0 0 0 4160 0 8 4294904739 2434 1682 2480 98 1 530 5 5 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 211 213 530 201 205 4160 690 2656 98 1 32 4160 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 105 0 0 0 106 0 0 0 205 0 0 0 208 0 0 0] 98 0 1600 0 29 8 'cell22' 410 2352 98 20 0 2208 98 2 8 1140924416 1 4512 0 0 0 7 0 0 0 4512 0 8 4294904739 2434 1682 2480 98 1 530 7 5 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 211 427 530 201 203 4512 690 2656 98 1 32 4512 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 105 0 0 0 213 0 0 0 205 0 0 0 58 1 0 0] 98 0 1600 0 29 8 'cell32' 410 2352 98 20 0 2208 98 2 8 1140924416 1 4864 0 0 0 7 0 0 0 4864 0 8 4294904739 2434 1682 2480 98 1 530 3 7 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 421 1 530 201 203 4864 690 2656 98 1 32 4864 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 0 0 0 0 54 1 0 0 101 0 0 0] 98 0 1600 0 29 8 'cell13' 410 2352 98 20 0 2208 98 2 8 1140924416 1 5216 0 0 0 7 0 0 0 5216 0 8 4294904739 2434 1682 2480 98 1 530 3 5 0 1 1 0 0 32 0 0 0 626 202 208 98 2 690 720 98 2 530 211 1 530 201 203 5216 690 2656 98 1 32 5216 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 105 0 0 0 0 0 0 0 205 0 0 0 101 0 0 0] 98 0 1600 0 29 8 'cell12' 0 626 202 208 98 1 690 720 98 2 530 5 5 530 621 629 2208 818 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 2 0 0 0 2 0 0 0 56 1 0 0 60 1 0 0] 98 9 3456 5216 4864 2336 4160 3104 3808 4512 2752 1600 0 27 992 1600 0 27 1600 0 27 )! !
 !QuantumTTTShell class categoriesFor: #defaultModel!public! !
 !QuantumTTTShell class categoriesFor: #resource_Default_view!public!resources-views! !
 
