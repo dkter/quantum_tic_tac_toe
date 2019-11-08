@@ -110,6 +110,10 @@ cellString
 		^stream contents
 	]!
 
+clear
+	isClassical := false.
+	tiles := OrderedCollection new.!
+
 getOne
 	^tiles at: 1!
 
@@ -164,6 +168,7 @@ tiles: anOrderedCollection
 	tiles := anOrderedCollection.! !
 !QuantumTTTCell categoriesFor: #add:!public! !
 !QuantumTTTCell categoriesFor: #cellString!public! !
+!QuantumTTTCell categoriesFor: #clear!public! !
 !QuantumTTTCell categoriesFor: #getOne!public! !
 !QuantumTTTCell categoriesFor: #hasTwoOrMoreStates!public! !
 !QuantumTTTCell categoriesFor: #includes:!public! !
@@ -488,10 +493,15 @@ resolveUnpairedSuperpositions
 	].
 	
 	counts keysAndValuesDo: [:eachKey :eachValue |
-		(eachValue = 1 and: [(classical includes: eachKey) not]) ifTrue: [
+		(eachValue = 1) ifTrue: [
 			| pos |
 			pos := positions at: eachKey.
-			self put: eachKey at: pos
+			(classical includes: eachKey) ifFalse: [
+				self put: eachKey at: pos
+			]
+			ifTrue: [
+				(self at: pos) clear.
+			]
 		]
 	]! !
 !QuantumTTTGame categoriesFor: #at:!public! !
