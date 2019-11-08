@@ -5,6 +5,7 @@ package paxVersion: 1;
 
 
 package classNames
+	add: #ButtonPresenter;
 	add: #QuantumError;
 	add: #QuantumTTTCell;
 	add: #QuantumTTTGame;
@@ -20,7 +21,7 @@ package globalAliases: (Set new
 
 package setPrerequisites: (IdentitySet new
 	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\Base\Dolphin';
-	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Presenters\List\Dolphin List Presenter';
+	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Presenters\Prompters\Dolphin Choice Prompter';
 	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Base\Dolphin MVP Base';
 	yourself).
 
@@ -49,7 +50,12 @@ Model subclass: #QuantumTTTGame
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
 Shell subclass: #QuantumTTTShell
-	instanceVariableNames: 'boardPresenter tileButtons'
+	instanceVariableNames: 'currentSymbol currentTurn superposition cells cycle'
+	classVariableNames: ''
+	poolDictionaries: ''
+	classInstanceVariableNames: ''!
+ValuePresenter subclass: #ButtonPresenter
+	instanceVariableNames: ''
 	classVariableNames: ''
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
@@ -76,6 +82,22 @@ add: aTile
 	]
 	ifTrue: [
 		QuantumError signal: 'Cell is classical and cannot be changed'
+	]!
+
+cellString
+	self isEmpty ifTrue: [^''].
+
+	isClassical ifTrue: [
+		^tile cellString
+	]
+	ifFalse: [
+		| stream |
+		stream := String new writeStream.
+		stream nextPut: $[.
+		tiles do: [:eachTile | stream nextPutAll: eachTile cellString]
+			  separatedBy: [stream space].
+		stream nextPut: $].
+		^stream contents
 	]!
 
 getOne
@@ -119,6 +141,7 @@ tiles
 	isClassical ifTrue: [QuantumError signal: 'Cell is classical'].
 	^tiles! !
 !QuantumTTTCell categoriesFor: #add:!public! !
+!QuantumTTTCell categoriesFor: #cellString!public! !
 !QuantumTTTCell categoriesFor: #getOne!public! !
 !QuantumTTTCell categoriesFor: #hasTwoOrMoreStates!public! !
 !QuantumTTTCell categoriesFor: #includes:!public! !
@@ -144,6 +167,9 @@ QuantumTTTTile comment: ''!
 !QuantumTTTTile categoriesForClass!Kernel-Objects! !
 !QuantumTTTTile methodsFor!
 
+cellString
+	^(symbol asString),(turn printString)!
+
 printOn: aStream
 	aStream nextPutAll: 'a QuantumTTTTile('.
 	symbol printOn: aStream.
@@ -165,6 +191,7 @@ turn
 
 turn: anInteger
 	turn := anInteger! !
+!QuantumTTTTile categoriesFor: #cellString!public! !
 !QuantumTTTTile categoriesFor: #printOn:!public! !
 !QuantumTTTTile categoriesFor: #printString!public! !
 !QuantumTTTTile categoriesFor: #symbol!public! !
@@ -273,7 +300,16 @@ place: tile at: pos
 	^self place: tile x: (pos x) y: (pos x)!
 
 place: tile x: x y: y
-	((board at: y) at: x) add: tile!
+	((board at: y) at: x) add: tile.
+	self trigger: #boardUpdated!
+
+placeSuperposition: tile pos1: pos1 pos2: pos2
+	self placeSuperposition: tile
+		 x1: pos1 x
+		 y1: pos1 y
+		 x2: pos2 x
+		 y2: pos2 y
+	!
 
 placeSuperposition: tile x1: x1 y1: y1 x2: x2 y2: y2
 	self place: tile x: x1 y: y1.
@@ -284,7 +320,8 @@ put: tile at: pos
 	^self put: tile x: (pos x) y: (pos y)!
 
 put: tile x: x y: y
-	((board at: y) at: x) resolveTo: tile!
+	((board at: y) at: x) resolveTo: tile.
+	self trigger: #boardUpdated!
 
 resolveCycle: aCyclicEntanglement atX: x y: y tile: aTile
 	"Given a cyclic entanglement as a list of positions,
@@ -346,6 +383,7 @@ resolveUnpairedSuperpositions
 !QuantumTTTGame categoriesFor: #initialize!public! !
 !QuantumTTTGame categoriesFor: #place:at:!private! !
 !QuantumTTTGame categoriesFor: #place:x:y:!private! !
+!QuantumTTTGame categoriesFor: #placeSuperposition:pos1:pos2:!public! !
 !QuantumTTTGame categoriesFor: #placeSuperposition:x1:y1:x2:y2:!public! !
 !QuantumTTTGame categoriesFor: #put:at:!private! !
 !QuantumTTTGame categoriesFor: #put:x:y:!private! !
@@ -357,18 +395,85 @@ QuantumTTTShell comment: ''!
 !QuantumTTTShell categoriesForClass!MVP-Presenters! !
 !QuantumTTTShell methodsFor!
 
+addToSuperposition: aPoint
+	superposition add: aPoint.
+	superposition size = 2 ifTrue: [
+		self placeSuperposition.
+		self advanceTurn.
+		superposition := OrderedCollection new.
+		self checkCycle.
+		self updateCells.
+	]!
+
+advanceTurn
+	currentSymbol = #X ifTrue: [
+		currentSymbol := #O
+	]
+	ifFalse: [
+		currentSymbol := #X.
+		currentTurn := currentTurn + 1.
+	]!
+
+checkCycle
+	cycle := self model findCyclicEntanglements.!
+
 createComponents
 	super createComponents.
-	boardPresenter := self add: ListPresenter new name: 'board'.!
+	currentSymbol := #X.
+	currentTurn := 1.
+	superposition := OrderedCollection new.
+	cycle := nil.
+	cells := Array
+		with: (Array with: 'cell11' with: 'cell12' with: 'cell13')
+		with: (Array with: 'cell21' with: 'cell22' with: 'cell23')
+		with: (Array with: 'cell31' with: 'cell32' with: 'cell33').
+		!
 
 model: aQuantumTTTGame
-	super model: aQuantumTTTGame.
-	boardPresenter model: (aQuantumTTTGame aspectValue: #board).!
+	super model: aQuantumTTTGame.!
 
-onCellPress: aPoint! !
+onCellPress: aPoint
+	cycle = nil ifTrue: [
+		self addToSuperposition: aPoint.
+	]
+	ifFalse: [
+		self resolveCycle: aPoint.
+	]!
+
+placeSuperposition
+	| tile |
+	tile := QuantumTTTTile symbol: currentSymbol turn: currentTurn.
+	self model placeSuperposition: tile
+			   pos1: (superposition at: 1)
+			   pos2: (superposition at: 2)!
+
+resolveCycle: aPoint
+	| tile |
+	tile := ChoicePrompter choices: ((self model at: aPoint) tiles)
+						   caption: 'Select a tile to collapse into'.
+	self model resolveCycle: cycle atX: (aPoint x) y: (aPoint y) tile: tile.
+	cycle := nil.
+	self updateCells.!
+
+updateCells
+	self model board doWithIndex: [:row :iy |
+		row doWithIndex: [:cell :ix |
+			| btnName btn |
+			btnName := (cells at: ix) at: iy.
+			btn := self view viewNamed: btnName.
+			btn text: (cell cellString).
+			btn isEnabled: (cell isClassical).
+		]
+	]! !
+!QuantumTTTShell categoriesFor: #addToSuperposition:!public! !
+!QuantumTTTShell categoriesFor: #advanceTurn!public! !
+!QuantumTTTShell categoriesFor: #checkCycle!public! !
 !QuantumTTTShell categoriesFor: #createComponents!private! !
 !QuantumTTTShell categoriesFor: #model:!public! !
 !QuantumTTTShell categoriesFor: #onCellPress:!public! !
+!QuantumTTTShell categoriesFor: #placeSuperposition!public! !
+!QuantumTTTShell categoriesFor: #resolveCycle:!public! !
+!QuantumTTTShell categoriesFor: #updateCells!public! !
 
 !QuantumTTTShell class methodsFor!
 
@@ -383,9 +488,19 @@ resource_Default_view
 	ViewComposer openOn: (ResourceIdentifier class: self selector: #resource_Default_view)
 	"
 
-	^#(#'!!STL' 3 788558 10 ##(Smalltalk.STBViewProxy) 8 ##(Smalltalk.ShellView) 98 27 0 0 98 2 26607617 131073 416 0 524550 ##(Smalltalk.ColorRef) 8 4278190080 328198 ##(Smalltalk.Point) 651 691 551 0 0 0 416 0 234 256 98 18 410 8 ##(Smalltalk.PushButton) 98 20 0 416 98 2 8 1140924416 1 592 0 0 0 7 0 0 0 592 0 8 4294902955 1180998 4 ##(Smalltalk.CommandDescription) 0 0 1 1 0 0 32 0 0 0 983302 ##(Smalltalk.MessageSequence) 202 208 98 1 721670 ##(Smalltalk.MessageSend) 8 #createAt:extent: 98 2 530 21 217 530 181 181 592 983302 ##(Smalltalk.WINDOWPLACEMENT) 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 10 0 0 0 108 0 0 0 100 0 0 0 198 0 0 0] 98 0 530 193 193 0 29 8 'cell12' 410 608 98 20 0 416 98 2 8 1140924416 1 976 0 0 0 7 0 0 0 976 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 421 417 530 181 181 976 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 208 0 0 0 44 1 0 0 42 1 0 0] 98 0 944 0 29 8 'cell33' 410 608 98 20 0 416 98 2 8 1140924416 1 1248 0 0 0 7 0 0 0 1248 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 421 17 530 181 181 1248 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 8 0 0 0 44 1 0 0 98 0 0 0] 98 0 944 0 29 8 'cell31' 410 608 98 20 0 416 98 2 8 1140924416 1 1520 0 0 0 7 0 0 0 1520 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 17 19 530 181 181 1520 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 8 0 0 0 9 0 0 0 98 0 0 0 99 0 0 0] 98 0 944 0 29 8 'cell11' 410 608 98 20 0 416 98 2 8 1140924416 1 1792 0 0 0 7 0 0 0 1792 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 221 217 530 181 181 1792 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 108 0 0 0 200 0 0 0 198 0 0 0] 98 0 944 0 29 8 'cell22' 410 608 98 20 0 416 98 2 8 1140924416 1 2064 0 0 0 7 0 0 0 2064 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 21 417 530 181 181 2064 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 10 0 0 0 208 0 0 0 100 0 0 0 42 1 0 0] 98 0 944 0 29 8 'cell13' 410 608 98 20 0 416 98 2 8 1140924416 1 2336 0 0 0 7 0 0 0 2336 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 221 17 530 181 181 2336 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 8 0 0 0 200 0 0 0 98 0 0 0] 98 0 944 0 29 8 'cell21' 410 608 98 20 0 416 98 2 8 1140924416 1 2608 0 0 0 7 0 0 0 2608 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 421 217 530 181 181 2608 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 108 0 0 0 44 1 0 0 198 0 0 0] 98 0 944 0 29 8 'cell32' 410 608 98 20 0 416 98 2 8 1140924416 1 2880 0 0 0 7 0 0 0 2880 0 8 4294902955 690 0 0 1 1 0 0 32 0 0 0 722 202 208 98 1 786 816 98 2 530 221 417 530 181 181 2880 882 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 208 0 0 0 200 0 0 0 42 1 0 0] 98 0 944 0 29 8 'cell23' 0 0 0 0 0 1 0 0 0 0 1 0 0 722 202 208 98 2 786 816 98 2 530 3839 21 530 651 691 416 786 8 #updateMenuBar 98 0 416 882 8 #[44 0 0 0 0 0 0 0 0 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 127 7 0 0 10 0 0 0 196 8 0 0 99 1 0 0] 98 9 1520 592 2064 2336 1792 2880 1248 2608 976 944 0 27 )! !
+	^#(#'!!STL' 3 788558 10 ##(Smalltalk.STBViewProxy) 8 ##(Smalltalk.ShellView) 98 27 0 0 98 2 26607617 131073 416 0 524550 ##(Smalltalk.ColorRef) 8 4278190080 328198 ##(Smalltalk.Point) 651 691 551 0 0 0 416 0 234 256 98 18 410 8 ##(Smalltalk.PushButton) 98 20 0 416 98 2 8 1140924416 1 592 0 0 0 7 0 0 0 592 0 8 4294911001 1180998 4 ##(Smalltalk.CommandDescription) 459270 ##(Smalltalk.Message) 8 #onCellPress: 98 1 530 7 5 0 1 1 0 0 32 0 0 0 983302 ##(Smalltalk.MessageSequence) 202 208 98 2 721670 ##(Smalltalk.MessageSend) 8 #createAt:extent: 98 2 530 221 421 530 181 181 592 866 8 #isEnabled: 98 1 32 592 983302 ##(Smalltalk.WINDOWPLACEMENT) 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 210 0 0 0 200 0 0 0 44 1 0 0] 98 0 530 193 193 0 29 8 'cell32' 410 608 98 20 0 416 98 2 8 1140924416 1 1104 0 0 0 7 0 0 0 1104 0 8 4294911001 690 722 752 98 1 530 3 5 0 1 1 0 0 32 0 0 0 802 202 208 98 2 866 896 98 2 530 221 21 530 181 181 1104 866 976 98 1 32 1104 1010 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 10 0 0 0 200 0 0 0 100 0 0 0] 98 0 1072 0 29 8 'cell12' 410 608 98 20 0 416 98 2 8 1140924416 1 1456 0 0 0 7 0 0 0 1456 0 8 4294911001 690 722 752 98 1 530 3 7 0 1 1 0 0 32 0 0 0 802 202 208 98 2 866 896 98 2 530 421 21 530 181 181 1456 866 976 98 1 32 1456 1010 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 10 0 0 0 44 1 0 0 100 0 0 0] 98 0 1072 0 29 8 'cell13' 410 608 98 20 0 416 98 2 8 1140924416 1 1808 0 0 0 7 0 0 0 1808 0 8 4294911001 690 722 752 98 1 530 5 5 0 1 1 0 0 32 0 0 0 802 202 208 98 2 866 896 98 2 530 221 217 530 181 181 1808 866 976 98 1 32 1808 1010 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 110 0 0 0 108 0 0 0 200 0 0 0 198 0 0 0] 98 0 1072 0 29 8 'cell22' 410 608 98 20 0 416 98 2 8 1140924416 1 2160 0 0 0 7 0 0 0 2160 0 8 4294911001 690 722 752 98 1 530 3 3 0 1 1 0 0 32 0 0 0 802 202 208 98 2 866 896 98 2 530 17 19 530 181 181 2160 866 976 98 1 32 2160 1010 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 8 0 0 0 9 0 0 0 98 0 0 0 99 0 0 0] 98 0 1072 0 29 8 'cell11' 410 608 98 20 0 416 98 2 8 1140924416 1 2512 0 0 0 7 0 0 0 2512 0 8 4294911001 690 722 752 98 1 530 5 3 0 1 1 0 0 32 0 0 0 802 202 208 98 2 866 896 98 2 530 21 221 530 181 181 2512 866 976 98 1 32 2512 1010 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 10 0 0 0 110 0 0 0 100 0 0 0 200 0 0 0] 98 0 1072 0 29 8 'cell21' 410 608 98 20 0 416 98 2 8 1140924416 1 2864 0 0 0 7 0 0 0 2864 0 8 4294911001 690 722 752 98 1 530 5 7 0 1 1 0 0 32 0 0 0 802 202 208 98 2 866 896 98 2 530 421 221 530 181 181 2864 866 976 98 1 32 2864 1010 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 110 0 0 0 44 1 0 0 200 0 0 0] 98 0 1072 0 29 8 'cell23' 410 608 98 20 0 416 98 2 8 1140924416 1 3216 0 0 0 7 0 0 0 3216 0 8 4294911001 690 722 752 98 1 530 7 7 0 1 1 0 0 32 0 0 0 802 202 208 98 2 866 896 98 2 530 421 417 530 181 181 3216 866 976 98 1 32 3216 1010 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 210 0 0 0 208 0 0 0 44 1 0 0 42 1 0 0] 98 0 1072 0 29 8 'cell33' 410 608 98 20 0 416 98 2 8 1140924416 1 3568 0 0 0 7 0 0 0 3568 0 8 4294911001 690 722 752 98 1 530 7 3 0 1 1 0 0 32 0 0 0 802 202 208 98 2 866 896 98 2 530 21 421 530 181 181 3568 866 976 98 1 32 3568 1010 8 #[44 0 0 0 0 0 0 0 1 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 10 0 0 0 210 0 0 0 100 0 0 0 44 1 0 0] 98 0 1072 0 29 8 'cell31' 0 0 0 0 0 1 0 0 0 0 1 0 0 802 202 208 98 2 866 896 98 2 530 3839 21 530 651 691 416 866 8 #updateMenuBar 98 0 416 1010 8 #[44 0 0 0 0 0 0 0 0 0 0 0 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 255 127 7 0 0 10 0 0 0 196 8 0 0 99 1 0 0] 98 9 2160 1104 1456 2512 1808 2864 3568 592 3216 1072 0 27 )! !
 !QuantumTTTShell class categoriesFor: #defaultModel!public! !
 !QuantumTTTShell class categoriesFor: #resource_Default_view!public!resources-views! !
+
+ButtonPresenter guid: (GUID fromString: '{5041A1F5-4F4F-46B8-95FE-BF3817192CD9}')!
+ButtonPresenter comment: ''!
+!ButtonPresenter categoriesForClass!MVP-Presenters! !
+!ButtonPresenter methodsFor!
+
+onValueChanged
+	self halt.
+	self view text: self value.! !
+!ButtonPresenter categoriesFor: #onValueChanged!public! !
 
 "Binary Globals"!
 
