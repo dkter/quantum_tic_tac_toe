@@ -3,6 +3,10 @@ package := Package name: 'quantum_tic_tac_toe'.
 package paxVersion: 1;
 	basicComment: ''.
 
+package imageStripperBytes: (ByteArray fromBase64String: 'IVNUQiAzIEYPDQAEAAAASW1hZ2VTdHJpcHBlcgAAAABSAAAAEwAAAHF1YW50dW1fdGljX3RhY190
+b2VSAAAAPgAAAEM6XFVzZXJzXGRrdGVyXGJpZ19wcm9qZWN0c1xxdWFudHVtX3RpY190YWNfdG9l
+XHF1YW50dW10dHQuZXhlmgAAALABAABSAAAADwAAAFF1YW50dW1UVFRTaGVsbO+/JQAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA').
 
 package classNames
 	add: #ButtonPresenter;
@@ -20,12 +24,16 @@ package globalAliases: (Set new
 	yourself).
 
 package setPrerequisites: (IdentitySet new
+	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Contributions\ITC Gorisek\Dialect Abstraction Layer';
 	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\Base\Dolphin';
 	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Presenters\Prompters\Dolphin Choice Prompter';
 	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Views\Control Bars\Dolphin Control Bars';
 	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Base\Dolphin MVP Base';
 	add: '..\..\Documents\Dolphin Smalltalk 7\Core\Object Arts\Dolphin\MVP\Type Converters\Dolphin Type Converters';
 	yourself).
+
+package setManualPrerequisites: #(
+	'Dialect Abstraction Layer').
 
 package!
 
