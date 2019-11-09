@@ -55,7 +55,7 @@ Error subclass: #QuantumError
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
 Model subclass: #QuantumTTTGame
-	instanceVariableNames: 'board'
+	instanceVariableNames: 'board winner'
 	classVariableNames: 'BoardSize'
 	poolDictionaries: ''
 	classInstanceVariableNames: ''!
@@ -265,67 +265,78 @@ checkGameOver
 checkThreeInARow
 	"Check rows"
 	board do: [:row |
-		| rowFound |
-		rowFound := (
-			row conform: [:cell | cell isClassical and: [cell tile symbol = #X]]
-		) or: [
-			row conform: [:cell | cell isClassical and: [cell tile symbol = #O]]
-		].
-		
-		rowFound ifTrue: [^true]
+		(row conform: [:cell | cell isClassical and: [cell tile symbol = #X]])
+			ifTrue: [
+				winner := #X.
+				^true
+			].
+		(row conform: [:cell | cell isClassical and: [cell tile symbol = #O]])
+			ifTrue: [
+				winner := #O.
+				^true
+			].
 	].
 
 	"Check cols"
-	1 to: (board size) do: [:y |
-		| colFound |
-		colFound  := (
-			(1 to: (board size)) conform: [:x |
+	1 to: (board size) do: [:x |
+		(
+			(1 to: (board size)) conform: [:y |
 				| cell |
 				cell := self atX: x y: y.
 				cell isClassical and: [cell tile symbol = #X]
 			]
-		) or: [
-			(1 to: (board size)) conform: [:x |
+		) ifTrue: [
+			winner := #X.
+			^true
+		].
+
+		(
+			(1 to: (board size)) conform: [:y |
 				| cell |
 				cell := self atX: x y: y.
 				cell isClassical and: [cell tile symbol = #O]
 			]
+		) ifTrue: [
+			winner := #O.
+			^true
 		].
-
-		colFound ifTrue: [^true]
 	].
 
 	"Check diagonals"
-	[
-		| diagFound |
-		diagFound := (((
-			(1 to: (board size)) conform: [:x |
-				| cell |
-				cell := self atX: x y: x.
-				cell isClassical and: [cell tile symbol = #X]
-			]
-		) or: [
-			(1 to: (board size)) conform: [:x |
-				| cell |
-				cell := self atX: x y: x.
-				cell isClassical and: [cell tile symbol = #O]
-			]
-		]) or: [
-			(1 to: (board size)) conform: [:x |
-				| cell |
-				cell := self atX: x y: (board size - x + 1).
-				cell isClassical and: [cell tile symbol = #O]
-			]
-		]) or: [
-			(1 to: (board size)) conform: [:x |
-				| cell |
-				cell := self atX: x y: (board size - x + 1).
-				cell isClassical and: [cell tile symbol = #O]
-			]
-		].
+	((
+		(1 to: (board size)) conform: [:x |
+			| cell |
+			cell := self atX: x y: x.
+			cell isClassical and: [cell tile symbol = #X]
+		]
+	) or: [
+		(1 to: (board size)) conform: [:x |
+			| cell |
+			cell := self atX: x y: (board size - x + 1).
+			cell isClassical and: [cell tile symbol = #X]
+		]
+	]) ifTrue: [
+		winner := #X.
+		^true
+	].
 
-		diagFound ifTrue: [^true]
-	] value.
+
+	((
+		(1 to: (board size)) conform: [:x |
+			| cell |
+			cell := self atX: x y: x.
+			cell isClassical and: [cell tile symbol = #O]
+		]
+	) or: [
+		(1 to: (board size)) conform: [:x |
+			| cell |
+			cell := self atX: x y: (board size - x + 1).
+			cell isClassical and: [cell tile symbol = #O]
+		]
+	]) ifTrue: [
+		winner := #O.
+		^true
+	].
 
 	^false!
 
@@ -494,7 +505,10 @@ resolveUnpairedSuperpositions
 				(self at: pos) clear.
 			]
 		]
-	]! !
+	]!
+
+winner
+	^winner! !
 !QuantumTTTGame categoriesFor: #at:!public! !
 !QuantumTTTGame categoriesFor: #atX:y:!public! !
 !QuantumTTTGame categoriesFor: #board!public! !
@@ -512,6 +526,7 @@ resolveUnpairedSuperpositions
 !QuantumTTTGame categoriesFor: #put:x:y:!private! !
 !QuantumTTTGame categoriesFor: #resolveCycle:atX:y:tile:!public! !
 !QuantumTTTGame categoriesFor: #resolveUnpairedSuperpositions!private! !
+!QuantumTTTGame categoriesFor: #winner!public! !
 
 QuantumTTTShell guid: (GUID fromString: '{9FE1F139-75DF-43A6-99BD-94AAC8701E0A}')!
 QuantumTTTShell comment: ''!
@@ -637,7 +652,15 @@ updateStatus
 	stream := String new writeStream.
 	
 	gameOver ifTrue: [
-		stream nextPutAll: 'Game over'.
+		stream nextPutAll: 'Game over. '.
+		self model winner = nil ifTrue: [
+			stream nextPutAll: 'Nobody wins.'
+		]
+		ifFalse: [
+			stream
+				nextPutAll: self model winner asString;
+				nextPutAll: ' wins.'
+		]
 	]
 	ifFalse: [
 		cycle = nil ifTrue: [
