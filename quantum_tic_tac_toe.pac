@@ -469,15 +469,45 @@ resolveCycle: aCyclicEntanglement atX: x y: y tile: aTile
 	].
 	self resolveUnpairedSuperpositions!
 
+resolveCycleBranchesOf: aCyclicEntanglement
+	| tiles positions |
+	"Find tiles that appear twice in the list of positions"
+	tiles := Dictionary new.
+	positions := Dictionary new.
+	aCyclicEntanglement do: [:pos |
+		(self at: pos) tiles do: [:tile |
+			tiles at: tile put:
+				(tiles at: tile ifAbsent: [0]) + 1.
+			positions at: tile put: pos
+		]
+	].
+
+	tiles keysAndValuesDo: [:eachKey :eachValue |
+		(eachValue = 1) ifTrue: [
+			| partnerPos pos |
+			pos := positions at: eachKey.
+			partnerPos := self
+				getSuperpositionPartnerOf: eachKey
+				atX: (pos x)
+				y: (pos y).
+			self put: eachKey at: partnerPos.
+			(self at: pos) tiles remove: eachKey.
+		]
+	].
+
+	"Resolve unpaired until there aren't any left"
+	[self resolveUnpairedSuperpositions] whileTrue: []!
+
 resolveUnpairedSuperpositions
 	"Private - Run after resolveCycle:atX:y:tile:
 	If there is only one tile of a certain symbol and turn on the board,
 	we know its position, so it can become a classical tile.
 	If its pair is classical we know it's not there."
-	| counts positions classical |
+	| counts positions classical didSomething |
 	counts := Dictionary new.
 	positions := Dictionary new.
 	classical := OrderedCollection new.
+	didSomething := false.
 
 	board doWithIndex: [:row :y |
 		row doWithIndex: [:cell :x |
@@ -503,9 +533,12 @@ resolveUnpairedSuperpositions
 			]
 			ifTrue: [
 				(self at: pos) clear.
-			]
+			].
+			didSomething := true
 		]
-	]!
+	].
+
+	^didSomething!
 
 winner
 	^winner! !
@@ -525,6 +558,7 @@ winner
 !QuantumTTTGame categoriesFor: #put:at:!private! !
 !QuantumTTTGame categoriesFor: #put:x:y:!private! !
 !QuantumTTTGame categoriesFor: #resolveCycle:atX:y:tile:!public! !
+!QuantumTTTGame categoriesFor: #resolveCycleBranchesOf:!public! !
 !QuantumTTTGame categoriesFor: #resolveUnpairedSuperpositions!private! !
 !QuantumTTTGame categoriesFor: #winner!public! !
 
@@ -558,7 +592,10 @@ btnAt: point
 	^(cells at: point x) at: point y!
 
 checkCycle
-	cycle := self model findCyclicEntanglements.!
+	cycle := self model findCyclicEntanglements.
+	cycle = nil ifFalse: [
+		self model resolveCycleBranchesOf: cycle
+	]!
 
 checkGameOver
 	"If someone won or 8+ cells are filled, the game is over"
