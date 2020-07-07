@@ -2,6 +2,9 @@
 
 ![Screenshot](screenshot.png)
 
+### Please note
+This is still extremely buggy. I would try to fix some of the bugs but the issue is this game is really tough to wrap your head around and I barely understand what I'm doing or what's supposed to happen when playing the game.
+
 ### Instructions
 https://en.wikipedia.org/wiki/Quantum_tic-tac-toe#Gameplay
 
